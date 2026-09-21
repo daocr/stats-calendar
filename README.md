@@ -7,7 +7,7 @@
 部署后的地址：
 
 ```text
-https://stats-calendar.<workers-subdomain>.workers.dev/calendar.ics
+https://stats-calendar.guotang240.workers.dev/calendar.ics
 ```
 
 在 macOS 日历中选择“文件”→“新建日历订阅”，粘贴该 HTTPS 地址并选择自动刷新频率。事件为全天事件，不包含强制提醒；可在日历客户端设置提醒。
