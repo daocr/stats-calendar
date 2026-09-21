@@ -48,6 +48,16 @@ Wrangler 本地服务启动后访问 `http://localhost:8787/calendar.ics`。
 
 令牌不得写入代码、Wrangler 配置或提交历史。部署方式遵循 [Cloudflare 官方 GitHub Actions 文档](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)。
 
+### 回滚
+
+Cloudflare 保留不可变的 Worker 版本。生产验证失败时，先列出部署并回滚到上一版本，再复查订阅地址：
+
+```bash
+npx wrangler deployments list
+npx wrangler rollback <previous-version-id> --message "Rollback after failed calendar verification"
+curl --fail --head https://stats-calendar.guotang240.workers.dev/calendar.ics
+```
+
 ## 数据处理
 
 统计局列表当前以 `text/html` 返回近似 JSON，并带一个尾逗号。本项目只修复这个已知格式问题，然后严格验证目标年度日期、标题和 `stats.gov.cn` 详情链接。输出遵循 RFC 5545 的 CRLF、文本转义和 UTF-8 75 字节折行要求。
