@@ -127,6 +127,7 @@ describe("calendar worker", () => {
     );
     expect(first.headers.get("etag")).toMatch(/^"[a-f0-9]{64}"$/);
     expect(first.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(first.headers.get("x-calendar-data-source")).toBe("live");
     expect(await first.text()).toContain("SUMMARY:采购经理指数月度报告");
 
     const second = await handleRequest(
@@ -180,7 +181,7 @@ describe("calendar worker", () => {
     expect(await notModified.text()).toBe("");
   });
 
-  it("returns a generic uncached 502 when the source is unavailable", async () => {
+  it("serves the bundled snapshot when the live source is unavailable", async () => {
     const cache = new MemoryCache();
     const fetchSource = vi.fn(async () => {
       throw new Error("upstream internals");
@@ -191,7 +192,46 @@ describe("calendar worker", () => {
       context(),
       {
         cache,
+        fallbackSource: sourceBody,
         fetchSource,
+        now: () => new Date("2026-09-21T03:04:05Z"),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-calendar-data-source")).toBe("snapshot");
+    expect(await response.text()).toContain("SUMMARY:采购经理指数月度报告");
+    expect(fetchSource).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the bundled snapshot usable for the current release year", async () => {
+    const response = await handleRequest(
+      new Request("https://calendar.example/calendar.ics"),
+      context(),
+      {
+        cache: new MemoryCache(),
+        fetchSource: async () => {
+          throw new Error("source unavailable");
+        },
+        now: () => new Date("2026-09-21T03:04:05Z"),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-calendar-data-source")).toBe("snapshot");
+    expect((await response.text()).match(/BEGIN:VEVENT\r\n/g)?.length).toBe(176);
+  });
+
+  it("returns a generic 502 when both live and snapshot data are invalid", async () => {
+    const response = await handleRequest(
+      new Request("https://calendar.example/calendar.ics"),
+      context(),
+      {
+        cache: new MemoryCache(),
+        fallbackSource: "[]",
+        fetchSource: async () => {
+          throw new Error("source unavailable");
+        },
         now: () => new Date("2026-09-21T03:04:05Z"),
       },
     );
@@ -203,6 +243,5 @@ describe("calendar worker", () => {
         message: "Calendar data is temporarily unavailable",
       },
     });
-    expect(fetchSource).toHaveBeenCalledTimes(1);
   });
 });

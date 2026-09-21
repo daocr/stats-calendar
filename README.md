@@ -20,7 +20,7 @@ https://stats-calendar.guotang240.workers.dev/calendar.ics
 - `HEAD /calendar.ics`：只返回响应头。
 - `GET /`：重定向到 `/calendar.ics`。
 - 成功响应在 Cloudflare 边缘缓存 6 小时，并支持 `ETag`/`If-None-Match`。
-- 上游不可用或数据校验失败时返回 `502`，不会发布空日历。
+- 实时源不可用或校验失败时降级到随 Worker 发布的已验证快照；仅在两者都无效时返回 `502`，不会发布空日历。
 
 ## 本地开发
 

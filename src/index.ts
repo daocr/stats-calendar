@@ -1,5 +1,6 @@
 import { buildCalendar, parseSchedule } from "./calendar.ts";
 import { fetchOfficialSource, SOURCE_URL } from "./source.ts";
+import fallbackItems from "./fallback-source.json";
 
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const CACHE_CONTROL = "public, max-age=3600, s-maxage=21600";
@@ -15,6 +16,7 @@ export interface ExecutionContextLike {
 
 interface WorkerDependencies {
   cache: CalendarCache;
+  fallbackSource?: string;
   fetchSource: () => Promise<Response>;
   now: () => Date;
 }
@@ -46,6 +48,10 @@ export async function handleRequest(
     return responseForRequest(request, cached);
   }
 
+  const now = dependencies.now();
+  let events;
+  let dataSource = "live";
+
   try {
     const sourceResponse = await dependencies.fetchSource();
     if (!sourceResponse.ok) {
@@ -62,10 +68,38 @@ export async function handleRequest(
       throw new Error("Source response exceeds size limit");
     }
 
-    const now = dependencies.now();
-    const events = parseSchedule(raw, shanghaiYear(now), SOURCE_URL);
+    events = parseSchedule(raw, shanghaiYear(now), SOURCE_URL);
+  } catch (liveError) {
+    console.warn(
+      JSON.stringify({
+        event: "calendar_live_source_failed",
+        error: errorMessage(liveError),
+      }),
+    );
+    dataSource = "snapshot";
+
+    try {
+      const fallbackSource =
+        dependencies.fallbackSource ?? JSON.stringify(fallbackItems);
+      events = parseSchedule(fallbackSource, shanghaiYear(now), SOURCE_URL);
+    } catch (fallbackError) {
+      console.error(
+        JSON.stringify({
+          event: "calendar_fallback_failed",
+          error: errorMessage(fallbackError),
+        }),
+      );
+      return errorResponse(
+        502,
+        "UPSTREAM_UNAVAILABLE",
+        "Calendar data is temporarily unavailable",
+      );
+    }
+  }
+
+  try {
     const calendar = buildCalendar(events, now);
-    const response = await calendarResponse(calendar);
+    const response = await calendarResponse(calendar, dataSource);
 
     context.waitUntil(
       dependencies.cache.put(cacheKey, response.clone()).catch((error) => {
@@ -93,7 +127,10 @@ export async function handleRequest(
   }
 }
 
-async function calendarResponse(calendar: string): Promise<Response> {
+async function calendarResponse(
+  calendar: string,
+  dataSource: string,
+): Promise<Response> {
   const digest = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(calendar),
@@ -108,6 +145,7 @@ async function calendarResponse(calendar: string): Promise<Response> {
       "content-disposition": 'inline; filename="stats-calendar.ics"',
       "content-type": "text/calendar; charset=utf-8",
       etag,
+      "x-calendar-data-source": dataSource,
     }),
   });
 }
