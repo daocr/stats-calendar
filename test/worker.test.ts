@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  fetchOfficialSource,
   handleRequest,
   type CalendarCache,
   type ExecutionContextLike,
@@ -37,6 +38,20 @@ function context(): ExecutionContextLike & { pending: Promise<unknown>[] } {
 }
 
 describe("calendar worker", () => {
+  it("uses the redirect mode supported by the Cloudflare runtime", async () => {
+    const fetchImplementation = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        expect(init?.redirect).toBe("manual");
+        return new Response(sourceBody);
+      },
+    );
+
+    const response = await fetchOfficialSource(fetchImplementation);
+
+    expect(response.status).toBe(200);
+    expect(fetchImplementation).toHaveBeenCalledTimes(1);
+  });
+
   it("redirects the root and rejects unsupported routes and methods", async () => {
     const dependencies = {
       cache: new MemoryCache(),
