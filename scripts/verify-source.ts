@@ -1,16 +1,7 @@
 import { buildCalendar, parseSchedule } from "../src/calendar.ts";
+import { fetchOfficialSource, SOURCE_URL } from "../src/source.ts";
 
-const sourceUrl = "https://www.stats.gov.cn/sj/fbrc/index_fbrc.html";
-const response = await fetch(sourceUrl, {
-  headers: {
-    accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
-    "accept-language": "zh-CN,zh;q=0.9",
-    "user-agent":
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0 Safari/537.36",
-  },
-  redirect: "error",
-  signal: AbortSignal.timeout(10_000),
-});
+const response = await fetchOfficialSource();
 
 if (!response.ok) {
   throw new Error(`Source returned HTTP ${response.status}`);
@@ -23,7 +14,7 @@ const currentYear = Number(
     year: "numeric",
   }).format(now),
 );
-const events = parseSchedule(await response.text(), currentYear, sourceUrl);
+const events = parseSchedule(await response.text(), currentYear, SOURCE_URL);
 const calendar = buildCalendar(events, now);
 const eventCount = calendar.match(/BEGIN:VEVENT\r\n/g)?.length ?? 0;
 

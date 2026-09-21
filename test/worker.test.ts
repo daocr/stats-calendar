@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  fetchOfficialSource,
   handleRequest,
   type CalendarCache,
   type ExecutionContextLike,
 } from "../src/index.ts";
+import { fetchOfficialSource } from "../src/source.ts";
 
 const sourceBody = `[
   {
@@ -50,6 +50,18 @@ describe("calendar worker", () => {
 
     expect(response.status).toBe(200);
     expect(fetchImplementation).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a transient source request failure", async () => {
+    const fetchImplementation = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"))
+      .mockResolvedValueOnce(new Response(sourceBody));
+
+    const response = await fetchOfficialSource(fetchImplementation);
+
+    expect(response.status).toBe(200);
+    expect(fetchImplementation).toHaveBeenCalledTimes(2);
   });
 
   it("redirects the root and rejects unsupported routes and methods", async () => {
