@@ -48,6 +48,12 @@ export function parseSchedule(
 
     const date = candidate.SUB_TITLE;
     if (!/^\d{8}$/.test(date)) {
+      if (
+        date.startsWith(String(currentYear)) ||
+        date.startsWith(String(currentYear + 1))
+      ) {
+        throw new Error(`Invalid schedule date: ${date}`);
+      }
       continue;
     }
 
@@ -71,8 +77,11 @@ export function parseSchedule(
     const url = new URL(candidate.URL, source).href;
     const parsedUrl = new URL(url);
     if (
-      parsedUrl.protocol !== "https:" ||
-      parsedUrl.hostname !== "www.stats.gov.cn" ||
+      parsedUrl.origin !== "https://www.stats.gov.cn" ||
+      parsedUrl.username !== "" ||
+      parsedUrl.password !== "" ||
+      parsedUrl.search !== "" ||
+      parsedUrl.hash !== "" ||
       !parsedUrl.pathname.startsWith("/sj/fbrc/") ||
       !EVENT_URL_PATTERN.test(parsedUrl.pathname)
     ) {

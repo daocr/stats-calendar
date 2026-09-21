@@ -81,6 +81,36 @@ describe("parseSchedule", () => {
     ).toThrow("Invalid event URL");
   });
 
+  it("rejects malformed current-year values and disguised source links", () => {
+    expect(() =>
+      parseSchedule(
+        source([
+          {
+            SUB_TITLE: "2026-bad",
+            TITLE: "无效日期格式",
+            URL: "./202412/t20241230_1958101.html",
+          },
+        ]),
+        2026,
+        sourceUrl,
+      ),
+    ).toThrow("Invalid schedule date");
+
+    expect(() =>
+      parseSchedule(
+        source([
+          {
+            SUB_TITLE: "20261231",
+            TITLE: "伪装链接",
+            URL: "https://user:pass@www.stats.gov.cn:444/sj/fbrc/202412/t20241230_1958101.html",
+          },
+        ]),
+        2026,
+        sourceUrl,
+      ),
+    ).toThrow("Invalid event URL");
+  });
+
   it("rejects empty feeds instead of publishing an empty calendar", () => {
     expect(() => parseSchedule(source([]), 2026, sourceUrl)).toThrow(
       "No calendar events",
